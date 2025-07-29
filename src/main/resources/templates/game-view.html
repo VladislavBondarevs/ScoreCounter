@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game View</title>
+    <script src="/js/sockjs.min.js"></script>
+    <script src="/js/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-top: 20px;
+            font-size: 70px;
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            width: 100%;
+            max-width: 1700px;
+            margin: 10px 0;
+            padding: 10px 0;
+            background-color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .team {
+            text-align: center;
+            flex: 1;
+
+        }
+
+        .team h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .score {
+            font-size: 200px;
+            font-weight: bold;
+            color: #3C4898;
+        }
+
+        .table-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 48%;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+        }
+
+        td {
+            font-size: 16px;
+            height: 47px;
+            color: #2c3e50;
+            font-size: 44px;
+        }
+
+
+    #ad-container img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+            margin: 0 auto;
+            height: 100vh;
+        }
+
+        #gameView {
+            display: block;
+        }
+
+        #ad-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            text-align: center;
+        }
+
+        table tr:nth-child(odd) td {
+            background-color: #000;
+            color: #fff;
+        }
+
+        table tr:nth-child(even) td {
+            background-color: #fff;
+            color: #000;
+        }
+
+    </style>
+</head>
+
+<div id="ad-container" style="display: none;">
+    <img id="ad-image" src="" alt="Slideshow" />
+</div>
+
+<body>
+<div class="score-board">
+    <div class="team">
+        <h1 id="team1Name">Team 1</h1>
+        <div class="score" id="team1Score">0</div>
+    </div>
+    <div class="team">
+        <h1 id="team2Name">Team 2</h1>
+        <div class="score" id="team2Score">0</div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+        <tr>
+            <th>Round</th>
+            <th>Team 1</th>
+            <th>Team 2</th>
+        </tr>
+        </thead>
+        <tbody id="scoreTable1">
+        </tbody>
+    </table>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Round</th>
+            <th>Team 1</th>
+            <th>Team 2</th>
+        </tr>
+        </thead>
+        <tbody id="scoreTable2">
+        </tbody>
+    </table>
+</div>
+
+<script>
+    let photos = [];
+    let viewMode = "gameView";
+    let currentPhotoIndex = 0;
+    let timer;
+
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            console.log('Connected to WebSocket: ' + frame);
+
+            stompClient.subscribe('/topic/scores', function (message) {
+                const scores = JSON.parse(message.body);
+                console.log('Received scores:', scores);
+                updateScoreTables(scores);
+            });
+
+            stompClient.subscribe('/topic/names', function (message) {
+                const names = JSON.parse(message.body);
+                console.log('Received team names:', names);
+
+                document.getElementById("team1Name").textContent = names.team1Name;
+                document.getElementById("team2Name").textContent = names.team2Name;
+            });
+
+            stompClient.subscribe('/topic/viewMode', function (message) {
+                viewMode = JSON.parse(message.body);
+                console.log('View mode received:', viewMode);
+                switchView();
+            });
+            stompClient.subscribe('/topic/clear', function (message) {
+            console.log("Clear table message received:", message.body);
+            clearTableView();
+        });
+
+        }, function (error) {
+            console.error('WebSocket connection error: ', error);
+        });
+    }
+
+    function updateScoreTables(scores) {
+        const tableBody1 = document.getElementById("scoreTable1");
+        const tableBody2 = document.getElementById("scoreTable2");
+        tableBody1.innerHTML = "";
+        tableBody2.innerHTML = "";
+
+        scores.forEach(score => {
+            const row = `
+                <tr>
+                    <td>${score.round}</td>
+                    <td>${score.team1Score}</td>
+                    <td>${score.team2Score}</td>
+                </tr>`;
+            if (score.round <= 8) {
+                tableBody1.innerHTML += row;
+            } else {
+                tableBody2.innerHTML += row;
+            }
+        });
+
+        const team1Total = scores.reduce((sum, score) => sum + score.team1Score, 0);
+        const team2Total = scores.reduce((sum, score) => sum + score.team2Score, 0);
+
+        document.getElementById("team1Score").textContent = team1Total;
+        document.getElementById("team2Score").textContent = team2Total;
+    }
+
+    async function fetchPhotos() {
+    try {
+        const response = await fetch('/files');
+        if (response.ok) {
+            photos = await response.json();
+            console.log('Photos fetched:', photos);
+        } else {
+            console.error('Failed to fetch photos:', response.statusText);
+        }
+    } catch (error) {
+        console.error('Error while fetching photos:', error);
+    }
+}
+
+async function startPhotoSlideshow() {
+    await fetchPhotos();
+    if (photos.length === 0) {
+        console.error("No photos available for slideshow.");
+        return;
+    }
+    const adImage = document.getElementById("ad-image");
+    const adContainer = document.getElementById("ad-container");
+    adContainer.style.display = 'block';
+
+    let currentPhotoIndex = 0;
+    adImage.src = "/files/" + photos[currentPhotoIndex];
+
+    timer = setInterval(() => {
+        currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+        adImage.src = "/files/" + photos[currentPhotoIndex];
+    }, 30000);
+}
+
+
+   async function switchView() {
+    clearInterval(timer);
+
+    const adContainer = document.getElementById("ad-container");
+
+    if (viewMode === "gameView") {
+        adContainer.style.display = "none";
+    } else if (viewMode === "photosOnly") {
+        await startPhotoSlideshow();
+    }
+}
+
+function clearTableView() {
+    console.log("Clearing table in view...");
+    const tableBody1 = document.getElementById("scoreTable1");
+    const tableBody2 = document.getElementById("scoreTable2");
+
+    tableBody1.innerHTML = "";
+    tableBody2.innerHTML = "";
+
+    for (let i = 1; i <= 8; i++) {
+        tableBody1.innerHTML += `
+            <tr>
+                <td>${i}</td>
+                <td>0</td>
+                <td>0</td>
+            </tr>`;
+    }
+
+    for (let i = 9; i <= 16; i++) {
+        tableBody2.innerHTML += `
+            <tr>
+                <td>${i}</td>
+                <td>0</td>
+                <td>0</td>
+            </tr>`;
+    }
+
+    document.getElementById("team1Score").textContent = 0;
+    document.getElementById("team2Score").textContent = 0;
+    console.log("Table successfully cleared in view.");
+}
+
+
+    document.addEventListener("DOMContentLoaded", connect);
+
+</script>
+
+</body>
+</html>

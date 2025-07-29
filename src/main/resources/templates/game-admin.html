@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="https://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Admin</title>
+    <script src="/js/sockjs.min.js"></script>
+    <script src="/js/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .score-board {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .score-board div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 16px;
+            color: #2c3e50;
+        }
+
+        input[type="text"], input[type="file"] {
+            font-size: 16px;
+            padding: 5px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+        }
+
+        .table-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 45%;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        td input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            text-align: center;
+            font-size: 14px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+        }
+
+        #ad-container img {
+            max-width: 100%;
+            max-height: 500px;
+            display: block;
+            margin: 20px auto;
+        }
+            .photo-management {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .photo-management form,
+    .photo-management div {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .photo-management button {
+        margin-top: 10px;
+    }
+
+    ul#photoList {
+        list-style-type: none;
+        padding: 0;
+    }
+
+    ul#photoList li {
+        margin-bottom: 10px;
+    }
+
+          table tr:nth-child(even) td {
+            background-color: #000;
+            color: #fff;
+        }
+
+        table tr:nth-child(odd) td {
+            background-color: #fff;
+            color: #000;
+        }
+
+    </style>
+</head>
+<body>
+<h1>Game Administration</h1>
+
+<div class="score-board">
+    <div>
+        <label for="team1NameInput">Team 1 Name:</label>
+        <input type="text" id="team1NameInput" value="Team 1" onchange="sendNameUpdate()">
+    </div>
+    <div>
+        <p id="team1Name"></p>
+    </div>
+</div>
+
+<div class="score-board">
+    <div>
+        <label for="team2NameInput">Team 2 Name:</label>
+        <input type="text" id="team2NameInput" value="Team 2" onchange="sendNameUpdate()">
+    </div>
+    <div>
+        <p id="team2Name"></p>
+    </div>
+</div>
+
+<div class="score-board">
+    <div>
+        <label>
+            <input type="radio" name="viewMode" value="gameView" checked onchange="switchView()"> Nur Game View
+        </label>
+       <label>
+            <input type="radio" name="viewMode" value="photosOnly" onchange="switchView()"> Nur Bilds
+        </label>
+    </div>
+
+</div>
+
+<div id="gameView">
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th>Round</th>
+                <th>Team 1</th>
+                <th>Team 2</th>
+            </tr>
+            </thead>
+            <tbody id="scoreTable1">
+            <script>
+                for (let i = 1; i <= 8; i++) {
+                    document.write(`
+                        <tr>
+                            <td>${i}</td>
+                            <td><input type="number" class="team1Score" value="0"></td>
+                            <td><input type="number" class="team2Score" value="0"></td>
+                        </tr>`);
+                }
+            </script>
+            </tbody>
+        </table>
+
+        <table>
+            <thead>
+            <tr>
+                <th>Round</th>
+                <th>Team 1</th>
+                <th>Team 2</th>
+            </tr>
+            </thead>
+            <tbody id="scoreTable2">
+            <script>
+                for (let i = 9; i <= 16; i++) {
+                    document.write(`
+                        <tr>
+                            <td>${i}</td>
+                            <td><input type="number" class="team1Score" value="0"></td>
+                            <td><input type="number" class="team2Score" value="0"></td>
+                        </tr>`);
+                }
+            </script>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="score-board">
+    <div class="photo-management">
+        <form method="POST" action="/upload" enctype="multipart/form-data">
+            <label for="newPhoto">Neues Foto hochladen:</label>
+            <input type="file" id="newPhoto" name="files" multiple required>
+            <button type="submit">Hochladen</button>
+        </form>
+
+        <form id="photoForm">
+            <h3>Fotos Wählen</h3>
+            <ul id="photoList">
+                <li th:each="file : ${files}">
+                    <img th:src="@{/files/{filename}(filename=${file})}" style="width: 150px; margin: 10px;">
+                    <label th:text="${file}"></label>
+                    <button type="button" class="delete-button" th:attr="data-filename=${file}">Delete</button>
+                </li>
+            </ul>
+
+        </form>
+
+
+
+
+        </form>
+    </div>
+    <div id="photo-list"></div>
+
+    <div class="score-board">
+        <button onclick="clearTable()">Tabelle leeren</button>
+    </div>
+
+</div>
+
+<script>
+    let photos = [];
+    let currentPhotoIndex = 0;
+    let timer;
+    let stompClient = null;
+    let viewMode = "gameView";
+
+function connect() {
+    const socket = new SockJS('/ws');
+    stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, function(frame) {
+        console.log('Connected to WebSocket: ' + frame);
+
+        stompClient.subscribe('/topic/scores', function(message) {
+            const scores = JSON.parse(message.body);
+            console.log('Scores received:', scores);
+        });
+
+        stompClient.subscribe('/topic/names', function(message) {
+            const names = JSON.parse(response.body);
+            console.log('Team names received:', names);
+            document.getElementById("team1Name").textContent = names.team1Name;
+            document.getElementById("team2Name").textContent = names.team2Name;
+        });
+
+        sendViewMode();
+    }, function(error) {
+        console.error('WebSocket error: ', error);
+    });
+}
+
+
+
+        function sendViewMode() {
+    if (stompClient && stompClient.connected) {
+        const selectedViewMode = document.querySelector('input[name="viewMode"]:checked').value;
+        stompClient.send("/app/updateViewMode", {}, JSON.stringify(selectedViewMode));
+        console.log("View mode updated and sent:", selectedViewMode);
+    } else {
+        console.log("WebSocket connection is not established yet.");
+    }
+}
+
+    function sendScores() {
+        const scores = [];
+        document.querySelectorAll("#scoreTable1 tr, #scoreTable2 tr").forEach((row, index) => {
+            const round = index + 1;
+            const team1Score = parseInt(row.querySelector(".team1Score").value || 0);
+            const team2Score = parseInt(row.querySelector(".team2Score").value || 0);
+
+            scores.push({ round, team1Score, team2Score });
+        });
+
+        stompClient.send("/app/updateScores", {}, JSON.stringify(scores));
+        console.log("Scores sent:", scores);
+    }
+
+    function attachScoreChangeListeners() {
+        document.querySelectorAll(".team1Score, .team2Score").forEach(input => {
+            input.addEventListener("change", sendScores);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        connect();
+        attachScoreChangeListeners();
+        switchView();
+
+    });
+
+   function sendNameUpdate() {
+    const team1Name = document.getElementById("team1NameInput").value || "Team 1";
+    const team2Name = document.getElementById("team2NameInput").value || "Team 2";
+
+    fetch('/game/updateTeamNames', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            team1Name: team1Name,
+            team2Name: team2Name
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Server response:", data);
+        document.getElementById("team1Name").textContent = data.team1Name;
+        document.getElementById("team2Name").textContent = data.team2Name;
+    })
+    .catch(error => {
+        console.error("Error updating team names:", error);
+    });
+}
+
+async function loadPhotoList() {
+    try {
+        const response = await fetch('/files');
+
+        if (!response.ok) {
+            throw new Error(`Fehler beim upload: ${response.statusText}`);
+        }
+
+        const photos = await response.json();
+        const photoSelect = document.getElementById('photoSelect');
+
+        if (!photoSelect) {
+            console.error("Element with ID 'photoSelect' not found!");
+            return;
+        }
+
+        photoSelect.innerHTML = '';
+
+        photos.forEach(photo => {
+            const option = document.createElement('option');
+            option.value = photo;
+            option.textContent = photo;
+            photoSelect.appendChild(option);
+        });
+
+        console.log('Erfolgreich heruntergeladen:', photos);
+    } catch (error) {
+        console.error('Fehler:', error);
+    }
+}
+function updateSelectedPhotos() {
+    selectedPhotos = Array.from(document.querySelectorAll('input[name="photos"]:checked'))
+        .map(input => input.value);
+
+    if (selectedPhotos.length === 0) {
+        console.error("No photos selected!");
+        return;
+    }
+
+    stompClient.send("/app/selectPhotos", {}, JSON.stringify(selectedPhotos));
+}
+
+        document.addEventListener("DOMContentLoaded", () => {
+    const buttons = document.querySelectorAll(".delete-button");
+    buttons.forEach(button => {
+        button.addEventListener("click", () => {
+            const filename = button.getAttribute("data-filename");
+            deletePhoto(filename, button);
+        });
+    });
+});
+
+function deletePhoto(filename, button) {
+    fetch('/delete-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filename })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`File deleted: ${filename}`);
+            const liElement = button.closest("li");
+            liElement.remove();
+        } else {
+            response.text().then(errorMessage => console.error('Failed to delete file:', errorMessage));
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+   function sendSelectedPhotos() {
+    const selectedPhotos = Array.from(document.querySelectorAll('input[name="photos"]:checked'))
+        .map(input => input.value);
+
+    if (selectedPhotos.length === 0) {
+        alert("Bitte wählen Sie mindestens ein Foto aus!");
+        return;
+    }
+
+    stompClient.send('/app/selectPhotos', {}, JSON.stringify(selectedPhotos));
+}
+
+function switchView() {
+    sendViewMode();
+}
+
+    document.addEventListener("DOMContentLoaded", () => {
+        connect();
+        attachScoreChangeListeners();
+    });
+function loadRoundScores() {
+    fetch('/game/getRoundScores')
+        .then(response => response.json())
+        .then(data => {
+            document.querySelectorAll("#scoreTable1 tr, #scoreTable2 tr").forEach((row, index) => {
+                if (data[index]) {
+                    row.querySelector(".team1Score").value = data[index].team1Score;
+                    row.querySelector(".team2Score").value = data[index].team2Score;
+                }
+            });
+        });
+}
+
+
+function calculateAndSendTotalScore() {
+    const roundScores = [];
+
+    const rows = document.querySelectorAll("#scoreTable1 tr, #scoreTable2 tr");
+
+    rows.forEach((row, index) => {
+        const team1ScoreInput = row.querySelector(".team1Score");
+        const team2ScoreInput = row.querySelector(".team2Score");
+
+        if (team1ScoreInput && team2ScoreInput) {
+            const team1Score = parseInt(team1ScoreInput.value) || 0;
+            const team2Score = parseInt(team2ScoreInput.value) || 0;
+
+            roundScores.push({
+                round: index + 1,
+                team1Score: team1Score,
+                team2Score: team2Score
+            });
+        }
+    });
+
+    fetch('/game/updateRoundScores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roundScores)
+    })
+    .then(response => response.json())
+    .then(data => console.log("Scores updated:", data))
+    .catch(error => console.error("Error updating scores:", error));
+}
+
+
+
+function loadTeamNames() {
+    fetch('/game/getTeamNames')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("team1NameInput").value = data.team1Name;
+            document.getElementById("team2NameInput").value = data.team2Name;
+
+            document.getElementById("team1Name").textContent = data.team1Name;
+            document.getElementById("team2Name").textContent = data.team2Name;
+        });
+}
+function sendNameUpdate() {
+    const team1Name = document.getElementById("team1NameInput").value || "Team 1";
+    const team2Name = document.getElementById("team2NameInput").value || "Team 2";
+
+    if (stompClient && stompClient.connected) {
+        stompClient.send("/app/updateNames", {}, JSON.stringify({
+            team1Name: team1Name,
+            team2Name: team2Name
+        }));
+    }
+}
+    document.addEventListener("DOMContentLoaded", () => {
+    loadRoundScores();
+    loadTeamNames();
+    document.querySelectorAll(".team1Score, .team2Score").forEach(input => {
+        input.addEventListener("change", calculateAndSendTotalScore);
+    });
+});
+    function clearTable() {
+    fetch('/game/clearRoundScores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Table cleared:", data);
+
+        document.querySelectorAll("#scoreTable1 tr, #scoreTable2 tr").forEach((row, index) => {
+            row.querySelector(".team1Score").value = 0;
+            row.querySelector(".team2Score").value = 0;
+        });
+    })
+    .catch(error => console.error("Error clearing table:", error));
+}
+
+
+
+
+</script>
+
+</body>
+</html>
