@@ -1,6 +1,7 @@
 # 🏆 ScoreCounter
-
-**ScoreCounter** is a Java Spring Boot application for real-time game scoring between two teams. It supports photo uploads, dynamic score updates, and live synchronization using WebSockets.
+ScoreCounter is a Java Spring Boot application for real-time game scoring between two teams.
+It supports dynamic score updates, live synchronization using WebSockets, and photo uploads used as advertisements or banners.
+The application also works fully offline, ensuring functionality without an internet connection.
 
 ## 📌 Features
 
