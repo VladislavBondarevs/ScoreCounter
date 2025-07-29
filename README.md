@@ -73,8 +73,8 @@ Displayed in the admin view with delete options
 ## 🛠 Config
 All app settings and upload path in application.properties
 
-## 📝 License
-This project is for demonstration and educational purposes only.
+## 📄 License
+This project is **private** and intended for internal use in a real-world production environment. Redistribution or public sharing is not permitted.
 
 ## 👤 Author
 Vladislav Bondarevs
